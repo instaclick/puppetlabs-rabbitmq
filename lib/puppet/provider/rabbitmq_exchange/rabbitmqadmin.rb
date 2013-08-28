@@ -12,9 +12,14 @@ Puppet::Type.type(:rabbitmq_exchange).provide(:rabbitmqadmin) do
     end
   end
 
-  def self.instances
+  def self.instances (resource_hash)
     resources = []
-    rabbitmqadmin('list', 'exchanges').split(/\n/)[3..-2].collect do |line|
+    first     = resource_hash.values.first
+    rabbitmq  = first ? first.catalog.resource('Class', 'rabbitmq') : {}
+    user_opt  = rabbitmq[:rabbitmqadmin_user] ? "-u#{rabbitmq[:rabbitmqadmin_user]}" : ''
+    pass_opt  = rabbitmq[:rabbitmqadmin_pass] ? "-p#{rabbitmq[:rabbitmqadmin_pass]}" : ''
+
+    rabbitmqadmin('list', 'exchanges', user_opt, pass_opt).split(/\n/)[3..-2].collect do |line|
       if line =~ /^\|\s+(\S+)\s+\|\s+(\S+)?\s+\|\s+(\S+)\s+\|\s+(\S+)\s+\|\s+(\S+)\s+\|\s+(\S+)\s+\|$/
         entry = {
           :ensure => :present,
@@ -29,9 +34,8 @@ Puppet::Type.type(:rabbitmq_exchange).provide(:rabbitmqadmin) do
     resources
   end
 
-
   def self.prefetch(resources)
-    packages = instances
+    packages = instances(resources)
     resources.keys.each do |name|
       if provider = packages.find{ |pkg| pkg.name == name }
         resources[name].provider = provider
@@ -44,16 +48,25 @@ Puppet::Type.type(:rabbitmq_exchange).provide(:rabbitmqadmin) do
   end
 
   def create
+
+    rabbitmq  = resource.catalog.resource('Class', 'rabbitmq')
+    user_opt  = rabbitmq[:rabbitmqadmin_user] ? "-u#{rabbitmq[:rabbitmqadmin_user]}" : ''
+    pass_opt  = rabbitmq[:rabbitmqadmin_pass] ? "-p#{rabbitmq[:rabbitmqadmin_pass]}" : ''
     vhost_opt = should_vhost ? "--vhost=#{should_vhost}" : ''
-    name = resource[:name].split('@')[0]
-    rabbitmqadmin('declare', 'exchange', vhost_opt, "name=#{name}", "type=#{resource[:type]}")
+    name      = resource[:name].split('@')[0]
+
+    rabbitmqadmin('declare', 'exchange', vhost_opt, user_opt, pass_opt, "name=#{name}", "type=#{resource[:type]}")
     @property_hash[:ensure] = :present
   end
 
   def destroy
+    rabbitmq  = resource.catalog.resource('Class', 'rabbitmq')
+    user_opt  = rabbitmq[:rabbitmqadmin_user] ? "-u#{rabbitmq[:rabbitmqadmin_user]}" : ''
+    pass_opt  = rabbitmq[:rabbitmqadmin_pass] ? "-p#{rabbitmq[:rabbitmqadmin_pass]}" : ''
     vhost_opt = should_vhost ? "--vhost=#{should_vhost}" : ''
-    name = resource[:name].split('@')[0]
-    rabbitmqadmin('delete', 'exchange', vhost_opt, "name=#{name}")
+    name      = resource[:name].split('@')[0]
+
+    rabbitmqadmin('delete', 'exchange', vhost_opt, user_opt, pass_opt, "name=#{name}")
     @property_hash[:ensure] = :absent
   end
 
